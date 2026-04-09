@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    env_file: ./backend/.env.example
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://ticketly:ticketly@db:5432/ticketly
+    ports:
+      - "8001:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=ticketly
+      - POSTGRES_PASSWORD=ticketly
+      - POSTGRES_DB=ticketly
+    ports:
+      - "5433:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
