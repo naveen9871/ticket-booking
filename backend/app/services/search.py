@@ -1,38 +1,43 @@
+from sqlalchemy import false
 from sqlmodel import Session, select
 
-from app.models import Movie, Theatre, Showtime
+from app.models import Movie, Screen, Showtime, Theatre
 
 
 def search_catalog(session: Session, query: str) -> dict:
     q = f"%{query.lower()}%"
-    # Basic keyword extraction for city/genre/title
-    words = query.lower().split()
-    
-    movie_query = select(Movie).where(Movie.title.ilike(q) | Movie.genre.ilike(q) | Movie.tags.ilike(q))
-    movies = session.exec(movie_query).all()
-    
-    theatre_query = select(Theatre).where(Theatre.name.ilike(q) | Theatre.city.ilike(q))
-    theatres = session.exec(theatre_query).all()
-    
-    movie_ids = [m.id for m in movies]
-    theatre_ids = [t.id for t in theatres]
-    
-    showtime_query = select(Showtime)
-    if movie_ids or theatre_ids:
-        # If we found specific movies/theatres, find showtimes for them
-        conditions = []
-        if movie_ids:
-            conditions.append(Showtime.movie_id.in_(movie_ids))
-        if theatre_ids:
-            # Also need to link theatre -> screen -> showtime or just search screens in theatre
-            # For simplicity, we filter by movie_id and maybe theatre city separately
-            pass
-        
-        if conditions:
-            showtime_query = showtime_query.where(conditions[0]) # Simplified
-            
-    showtimes = session.exec(showtime_query.limit(20)).all()
-    
+
+    movies = session.exec(
+        select(Movie).where(
+            Movie.title.ilike(q) | Movie.genre.ilike(q) | Movie.language.ilike(q) | Movie.tags.ilike(q)
+        )
+    ).all()
+
+    theatres = session.exec(
+        select(Theatre).where(Theatre.name.ilike(q) | Theatre.city.ilike(q) | Theatre.address.ilike(q))
+    ).all()
+
+    movie_ids = {movie.id for movie in movies}
+    theatre_ids = {theatre.id for theatre in theatres}
+    screen_ids = {
+        screen.id
+        for screen in session.exec(select(Screen).where(Screen.theatre_id.in_(theatre_ids))).all()
+    } if theatre_ids else set()
+
+    showtimes_query = select(Showtime)
+    if movie_ids and screen_ids:
+        showtimes_query = showtimes_query.where(
+            Showtime.movie_id.in_(movie_ids) | Showtime.screen_id.in_(screen_ids)
+        )
+    elif movie_ids:
+        showtimes_query = showtimes_query.where(Showtime.movie_id.in_(movie_ids))
+    elif screen_ids:
+        showtimes_query = showtimes_query.where(Showtime.screen_id.in_(screen_ids))
+    else:
+        showtimes_query = showtimes_query.where(false())
+
+    showtimes = session.exec(showtimes_query.limit(20)).all()
+
     return {
         "movies": movies,
         "theatres": theatres,

@@ -22,7 +22,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
 
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+
+    LLM_PROVIDER: str = "gemini" # 'openai' or 'gemini'
+
     REDIS_URL: str = "redis://localhost:6379/0"
+    SEAT_HOLD_TTL_SECONDS: int = 180
+    DEMO_SEED_ON_STARTUP: bool = False
 
 
 settings = Settings()

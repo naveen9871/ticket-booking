@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 
-from app.models import Movie, Booking, Showtime
+from app.models import Movie, User
 
 
 def recommend_movies(session: Session, user_id: int | None = None) -> list[Movie]:

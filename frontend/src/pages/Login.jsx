@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api, { setToken } from '../api'
 
 export default function Login({ onLogin }) {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
-  const [step, setStep] = useState('phone') // phone, otp
+  const [step, setStep] = useState('phone')
   const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   const handleStartOtp = async () => {
     setLoading(true)
@@ -15,7 +17,7 @@ export default function Login({ onLogin }) {
         alert(`Demo OTP: ${res.data.otp_debug}`)
         setStep('otp')
       }
-    } catch (e) {
+    } catch (error) {
       alert('Error sending OTP')
     }
     setLoading(false)
@@ -27,7 +29,8 @@ export default function Login({ onLogin }) {
       const res = await api.post('/auth/otp/verify', null, { params: { phone, otp } })
       setToken(res.data.access_token)
       onLogin(res.data)
-    } catch (e) {
+      navigate('/')
+    } catch (error) {
       alert('Invalid OTP')
     }
     setLoading(false)
@@ -38,48 +41,74 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="page" style={{ maxWidth: '400px', textAlign: 'center' }}>
-      <h1 style={{ fontSize: '2.5rem' }}>Welcome Back</h1>
-      <p className="subtitle">Login to your cinematic world</p>
-      
-      <div className="hero-card" style={{ marginTop: '2rem' }}>
-        {step === 'phone' ? (
-          <>
-            <input
-              className="chat-input"
-              style={{ width: '100%', marginBottom: '1rem', padding: '1rem', borderRadius: '12px' }}
-              placeholder="Mobile Number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-            <button className="primary" style={{ width: '100%' }} onClick={handleStartOtp} disabled={loading}>
-              {loading ? 'Sending...' : 'Get OTP'}
-            </button>
-          </>
-        ) : (
-          <>
-            <input
-              className="chat-input"
-              style={{ width: '100%', marginBottom: '1rem', padding: '1rem', borderRadius: '12px' }}
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-            />
-            <button className="primary" style={{ width: '100%' }} onClick={handleVerifyOtp} disabled={loading}>
-              {loading ? 'Verifying...' : 'Login'}
-            </button>
-            <button className="ghost" style={{ marginTop: '1rem' }} onClick={() => setStep('phone')}>
-              Back
-            </button>
-          </>
-        )}
+    <div className="auth-page">
+      <div className="auth-panel">
+        <div className="auth-copy">
+          <p className="eyebrow">Member Access</p>
+          <h1>Unlock instant checkout, ticket history, and smarter recommendations.</h1>
+          <p className="subtitle">
+            Sign in once and your next booking becomes a two-step flow: pick the show, confirm the seats.
+          </p>
+          <div className="auth-benefits">
+            <div className="benefit-card">
+              <strong>Faster Checkout</strong>
+              <span>Assistant-led booking with saved context.</span>
+            </div>
+            <div className="benefit-card">
+              <strong>mTicket Access</strong>
+              <span>Retrieve QR-based tickets right inside the app.</span>
+            </div>
+            <div className="benefit-card">
+              <strong>Personalized Picks</strong>
+              <span>Better discovery tuned to your city and language.</span>
+            </div>
+          </div>
+        </div>
 
-        <div style={{ margin: '2rem 0', color: 'var(--text-muted)' }}>OR</div>
+        <div className="auth-card">
+          <h2>{step === 'phone' ? 'Login with OTP' : 'Verify OTP'}</h2>
+          <p className="muted">
+            {step === 'phone'
+              ? 'Use your mobile number to start a secure session.'
+              : 'Enter the 6-digit code you received.'}
+          </p>
 
-        <button className="ghost" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }} onClick={handleGoogleLogin}>
-          <img src="https://www.google.com/favicon.ico" width="16" />
-          Continue with Google
-        </button>
+          {step === 'phone' ? (
+            <>
+              <input
+                className="auth-input"
+                placeholder="Mobile Number"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+              />
+              <button className="primary auth-button" onClick={handleStartOtp} disabled={loading}>
+                {loading ? 'Sending...' : 'Get OTP'}
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                className="auth-input"
+                placeholder="Enter 6-digit OTP"
+                value={otp}
+                onChange={(event) => setOtp(event.target.value)}
+              />
+              <button className="primary auth-button" onClick={handleVerifyOtp} disabled={loading}>
+                {loading ? 'Verifying...' : 'Login'}
+              </button>
+              <button className="ghost auth-button" onClick={() => setStep('phone')}>
+                Back
+              </button>
+            </>
+          )}
+
+          <div className="auth-divider">or continue with</div>
+
+          <button className="ghost auth-google" onClick={handleGoogleLogin}>
+            <img src="https://www.google.com/favicon.ico" width="16" height="16" alt="Google" />
+            Google
+          </button>
+        </div>
       </div>
     </div>
   )

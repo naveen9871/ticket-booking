@@ -17,6 +17,8 @@ class ChatRequest(BaseModel):
 class ConfirmRequest(BaseModel):
     showtime_id: int
     seats: list[str]
+    hold_token: str | None = None
+    session_key: str | None = None
 
 
 @router.post("/chat")
@@ -27,5 +29,12 @@ def chat(payload: ChatRequest, session: Session = Depends(get_session), user=Dep
 
 @router.post("/confirm")
 def confirm(payload: ConfirmRequest, session: Session = Depends(get_session), user=Depends(get_current_user)):
-    booking = confirm_booking(session, user.id, payload.showtime_id, payload.seats)
+    booking = confirm_booking(
+        session,
+        user.id,
+        payload.showtime_id,
+        payload.seats,
+        hold_token=payload.hold_token,
+        session_key=payload.session_key,
+    )
     return {"booking": booking}

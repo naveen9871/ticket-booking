@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db import init_db, get_session
-from app.data.dummy_data import seed_data
 from app.routers import auth, movies, theatres, showtimes, search, recommendations, bookings, assistant, admin, content
 
 app = FastAPI(title=settings.PROJECT_NAME)
@@ -20,8 +19,11 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
-    with get_session() as session:
-        seed_data(session)
+    if settings.DEMO_SEED_ON_STARTUP:
+        from app.data.dummy_data import seed_data
+
+        with get_session() as session:
+            seed_data(session)
 
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
