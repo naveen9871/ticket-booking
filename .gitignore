@@ -3,6 +3,13 @@
 .env.*
 !.env.example
 
+# Production env files (managed on server, never commit real secrets)
+backend/.env.prod
+frontend/.env.prod
+
+# Server-generated secret files
+.db_password
+
 # Node
 node_modules/
 npm-debug.log*
