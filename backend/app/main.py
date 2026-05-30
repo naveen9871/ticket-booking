@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db import init_db, get_session
-from app.routers import auth, movies, theatres, showtimes, search, recommendations, bookings, assistant, admin, content
+from app.routers import auth, movies, theatres, showtimes, search, recommendations, bookings, assistant, admin, content, autonomous
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -36,3 +36,4 @@ app.include_router(bookings.router, prefix=settings.API_V1_STR)
 app.include_router(assistant.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(content.router, prefix=settings.API_V1_STR)
+app.include_router(autonomous.router, prefix=settings.API_V1_STR)

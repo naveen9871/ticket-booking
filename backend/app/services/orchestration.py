@@ -10,6 +10,7 @@ from app.services.intent import parse_intent
 from app.services.planning import generate_plans
 from app.services.preferences import get_or_create_memory, load_profile, update_memory_from_intent
 from app.services.recovery import build_recovery_message, normalize_failure
+from app.services.release_monitoring import create_release_subscription
 from app.services.workflow import (
     create_agent_session,
     log_workflow_event,
@@ -53,6 +54,28 @@ def run_agentic_planning(
         trace.append({"agent": "Intent Agent", "status": "done", "detail": intent["summary"]})
         log_workflow_event(session, agent_session.id, "intent-agent", "INTENT_PARSE_COMPLETED", "COMPLETED", intent)
         update_agent_session(session, agent_session, status="RUNNING", current_stage="DISCOVERY", context={**context, "intent": intent})
+
+        if intent.get("kind") == "watch":
+            log_workflow_event(session, agent_session.id, "watch-agent", "SUBSCRIPTION_STARTED", "RUNNING")
+            movie_title = intent.get("movie") or message # fallback to raw message for title if not parsed
+            subscription = create_release_subscription(
+                session,
+                session_key=session_key,
+                user_id=user_id,
+                movie_title=movie_title,
+                city=intent.get("city") or "Bengaluru",
+                party_size=intent.get("party_size", 2),
+            )
+            trace.append({"agent": "Watch Agent", "status": "done", "detail": f"Set a release watch for {movie_title} in {subscription.city}."})
+            log_workflow_event(session, agent_session.id, "watch-agent", "SUBSCRIPTION_COMPLETED", "COMPLETED", {"id": subscription.id})
+            update_agent_session(session, agent_session, status="COMPLETED", current_stage="NOTIFY")
+            
+            return {
+                "type": "message",
+                "message": f"Understood! I've set a release watch for **{movie_title}** in **{subscription.city}**. I'll monitor partner theatres and notify you the moment bookings open.",
+                "context": {"session_key": session_key},
+                "trace": trace,
+            }
 
         log_workflow_event(session, agent_session.id, "discovery-agent", "DISCOVERY_STARTED", "RUNNING")
         candidates = discover_showtimes(session, intent)

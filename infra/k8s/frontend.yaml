@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticketly-frontend
+  namespace: ticketly
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ticketly-frontend
+  template:
+    metadata:
+      labels:
+        app: ticketly-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ticketly/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticketly-frontend
+  namespace: ticketly
+spec:
+  type: LoadBalancer
+  selector:
+    app: ticketly-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+

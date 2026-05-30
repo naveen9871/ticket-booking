@@ -53,10 +53,19 @@ def discover_showtimes(session: Session, intent: dict[str, Any], limit: int = 24
     for showtime in showtimes:
         enriched = enrich_showtime(session, showtime)
 
-        if intent.get("city") and enriched["city"] != intent["city"]:
-            continue
-        if intent.get("genre") and enriched["movie_genre"] != intent["genre"]:
-            continue
+        # Resilient filtering: check if city is in theatre's city OR address
+        if intent.get("city"):
+            target_city = intent["city"].lower()
+            city_match = (enriched["city"] and target_city in enriched["city"].lower()) or \
+                         (enriched["address"] and target_city in enriched["address"].lower())
+            if not city_match:
+                continue
+
+        # Allow partial genre matches (e.g. "Action" matches "Action, Thriller")
+        if intent.get("genre"):
+            target_genre = intent["genre"].lower()
+            if enriched["movie_genre"] and target_genre not in enriched["movie_genre"].lower():
+                continue
         if intent.get("language") and enriched["movie_language"] != intent["language"]:
             continue
         if intent.get("budget_max") and enriched["base_price"] * intent.get("party_size", 1) > intent["budget_max"]:

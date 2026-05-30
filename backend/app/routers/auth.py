@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 import random
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from authlib.integrations.starlette_client import OAuth
 
 from app.core.config import settings
+from app.core.deps import get_current_user
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.db import get_session
 from app.models import User
@@ -106,3 +108,27 @@ async def google_callback(request: Request, session: Session = Depends(get_sessi
         session.refresh(user)
     access = create_access_token(str(user.id))
     return {"access_token": access, "token_type": "bearer", "user": user}
+
+
+@router.post("/token")
+def oauth2_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    """OAuth2 password flow token endpoint used by the frontend."""
+    user = session.exec(select(User).where(User.email == form_data.username)).first()
+    if not user or not user.hashed_password or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token(str(user.id))
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/me")
+def get_me(user: User = Depends(get_current_user)):
+    """Return current authenticated user profile."""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "phone": user.phone,
+        "full_name": user.full_name,
+        "is_admin": user.is_admin,
+        "genre_preferences": user.genre_preferences,
+        "created_at": user.created_at,
+    }

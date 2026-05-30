@@ -1,52 +1,80 @@
-# Ticketly - Agentic Ticket Booking
+# Ticketly - Autonomous AI Movie Ticket Booking Platform
 
-Production-style ticket booking platform inspired by BookMyShow/District, with a conversational booking assistant, dynamic pricing simulation, smart search, and recommendations.
+Ticketly is a production-oriented AI booking assistant for high-demand movie releases such as Coolie, Leo, Salaar, and Pushpa. It monitors release openings, compares theatres, ranks seats, creates booking plans, and prepares fast checkout with seat holds and retry-aware workflows.
+
+## What Is Implemented
+
+- FastAPI backend with auth, movies, theatres, showtimes, recommendations, bookings, assistant workflows, admin/content APIs, and autonomous booking APIs.
+- Agentic planning pipeline with intent parsing, discovery, pricing, seat selection, preference memory, workflow events, recovery, and approval plans.
+- Autonomous release watch APIs for booking-open monitoring and notification creation.
+- Smart seat recommendation service returning best overall, best value, and premium grouped seats.
+- Provider adapter interface with demo BookMyShow-like adapter, ready for external integrations.
+- Seat hold model with TTL, conflict detection, and confirmation/release workflow.
+- React + TypeScript frontend redesigned as an autonomous movie booking operations cockpit.
+- Go booking-engine skeleton for idempotent reservation and distributed lock semantics.
+- Docker Compose with PostgreSQL, Redis, Kafka, Prometheus, and Grafana.
+- Kubernetes manifests, CI workflow, HLD, LLD, API contracts, deployment guide, and dissertation notes.
 
 ## Architecture
-- **Frontend**: React + Vite (UX-first layout, assistant sidebar)
-- **Backend**: FastAPI + SQLModel + JWT auth
-- **AI/Agentic**: Python agent orchestration with tool calls (search, recs, seats, pricing) and optional LLM integration
-- **Data**: Seeded dummy movies, theatres, and showtimes
 
-## Features
-- Smart search across movies and theatres
-- Personalized recommendations
-- Automated seat selection
-- Dynamic pricing simulation
-- Conversational booking assistant
-- Admin ops summary + content generation endpoint
-- OAuth (Google) + OTP auth stubs
+See:
 
-## Local Dev
-### Backend
+- [HLD](docs/HLD.md)
+- [LLD](docs/LLD.md)
+- [API Contracts](docs/API_CONTRACTS.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Dissertation Notes](docs/DISSERTATION.md)
+- [Production Readiness Analysis](docs/PRODUCTION_READINESS.md)
+
+## Production Reality
+
+This repository is a production-grade scaffold and dissertation-ready prototype. It is designed for real public users and theatre partners, but public launch still requires live provider contracts, theatre KYC/onboarding, payment gateway hardening, webhook reconciliation, support workflows, privacy controls, and load testing under same-show contention.
+
+The AI concierge can monitor, compare, recommend, and prepare a booking plan. It should not complete paid bookings without explicit user confirmation.
+
+## Local Development
+
+Backend:
+
 ```bash
 cd backend
-python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-### Frontend
+Frontend:
+
 ```bash
 cd frontend
 npm install
-cp .env.example .env
 npm run dev
 ```
 
-Open: `http://localhost:5173`
+Docker:
 
-## Docker Compose
 ```bash
 docker compose up --build
 ```
 
 Frontend: `http://localhost:3000`
-Backend: `http://localhost:8000`
 
-## Notes
-- OTP uses an in-memory store and returns `otp_debug` for demo use. Replace with Twilio or equivalent for production.
-- Google OAuth requires setting `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in `backend/.env`.
-- LLM integration is optional. Set `OPENAI_API_KEY` in `backend/.env`.
+Backend: `http://localhost:8001`
+
+Grafana: `http://localhost:3001`
+
+Prometheus: `http://localhost:9090`
+
+## Key APIs
+
+- `POST /api/v1/assistant/message` - conversational agentic planning.
+- `POST /api/v1/autonomous/seat-recommendations` - grouped smart seat ranking.
+- `POST /api/v1/autonomous/release-watch` - subscribe to release openings.
+- `POST /api/v1/autonomous/release-watch/run-cycle` - run demo monitor cycle.
+- `GET /api/v1/autonomous/ops/dashboard` - admin operations snapshot.
+- `POST /api/v1/autonomous/providers/probe` - provider adapter health/search probe.
+
+## Research Angle
+
+The project demonstrates autonomous workflow execution, AI-assisted theatre/seat decisioning, distributed booking coordination, retry recovery, and recommendation quality evaluation under concurrent demand.

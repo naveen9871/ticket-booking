@@ -5,7 +5,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.agents.llm import call_llm
-from app.models import Theatre
+from app.models import Movie, Theatre
 
 
 GENRES = ["Action", "Drama", "Comedy", "Thriller", "Sci-Fi", "Romance", "Horror", "Family"]
@@ -80,6 +80,26 @@ def _extract_genre(message: str) -> str | None:
     return None
 
 
+def _extract_movie_title(session: Session, message: str) -> str | None:
+    # Try common movie patterns (case insensitive)
+    patterns = [
+        r"(?:for|watch|about|book)\s+([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*)",
+        r"(?:when)\s+([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*)\s+(?:open|booking)",
+    ]
+    for p in patterns:
+        match = re.search(p, message, re.IGNORECASE)
+        if match:
+            return match.group(1).strip().title()
+    
+    # Check against database titles (sort by length descending to match longest title first)
+    movies = session.exec(select(Movie)).all()
+    movies.sort(key=lambda m: len(m.title), reverse=True)
+    for movie in movies:
+        if movie.title.lower() in message.lower():
+            return movie.title
+    return None
+
+
 def _extract_experience_mode(message: str) -> str:
     lowered = message.lower()
     if any(token in lowered for token in ["best seats", "premium", "imax", "luxury"]):
@@ -93,6 +113,8 @@ def _extract_experience_mode(message: str) -> str:
 
 def _extract_intent_kind(message: str) -> str:
     lowered = message.lower()
+    if any(token in lowered for token in ["alert", "watch", "notify", "remind", "when"]):
+        return "watch"
     if any(token in lowered for token in ["book", "reserve", "buy", "confirm"]):
         return "book"
     if any(token in lowered for token in ["plan", "suggest", "recommend"]):
@@ -141,6 +163,7 @@ def parse_intent(
     budget_max = _extract_budget(message)
     party_size = context.get("seat_count") or _extract_party_size(message)
     experience_mode = _extract_experience_mode(message)
+    movie = _extract_movie_title(session, message)
 
     if budget_max is None and experience_mode == "budget":
         budget_max = 500
@@ -151,6 +174,7 @@ def parse_intent(
     if not summary:
         summary = (
             f"{_extract_intent_kind(message).title()} request"
+            f"{f' for {movie}' if movie else ''}"
             f"{f' for {party_size} people' if party_size else ''}"
             f"{f' in {city}' if city else ''}"
             f"{f' with a {budget_max} budget' if budget_max else ''}."
@@ -168,6 +192,7 @@ def parse_intent(
 
     return {
         "kind": _extract_intent_kind(message),
+        "movie": movie,
         "city": city,
         "genre": genre,
         "language": language,

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.deps import get_current_user
 from app.data.dummy_data import seed_data
 from app.db import get_session
-from app.models import Movie, Screen, Showtime, Theatre
+from app.models import AuditLog, Booking, Movie, Screen, Showtime, Theatre, User
 from app.services.catalog import create_showtime, ensure_movie, ensure_screen, ensure_theatre, import_catalog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -127,3 +127,35 @@ def bootstrap_demo_catalog(session: Session = Depends(get_session), user=Depends
     require_admin(user)
     seed_data(session)
     return {"message": "Demo catalog seeded into the database"}
+
+
+@router.get("/audit-log")
+def get_audit_log(
+    limit: int = Query(default=50, le=200),
+    session: Session = Depends(get_session),
+    user=Depends(get_current_user),
+):
+    require_admin(user)
+    logs = session.exec(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)).all()
+    return {"logs": [
+        {
+            "id": log.id,
+            "actor_user_id": log.actor_user_id,
+            "action": log.action,
+            "resource_type": log.resource_type,
+            "resource_id": log.resource_id,
+            "created_at": log.created_at,
+        }
+        for log in logs
+    ]}
+
+
+@router.get("/bookings/recent")
+def get_recent_bookings(
+    limit: int = Query(default=20, le=100),
+    session: Session = Depends(get_session),
+    user=Depends(get_current_user),
+):
+    require_admin(user)
+    bookings = session.exec(select(Booking).order_by(Booking.created_at.desc()).limit(limit)).all()
+    return {"bookings": bookings}

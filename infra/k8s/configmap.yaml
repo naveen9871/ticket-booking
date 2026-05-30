@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticketly-config
+  namespace: ticketly
+data:
+  API_V1_STR: /api/v1
+  PROJECT_NAME: Ticketly
+  REDIS_URL: redis://redis:6379/0
+  DATABASE_URL: postgresql+psycopg2://ticketly:ticketly@postgres:5432/ticketly
+  DEMO_SEED_ON_STARTUP: "true"
+
