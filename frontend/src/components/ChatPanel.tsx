@@ -128,7 +128,15 @@ export function ChatPanel({ city, mobileOpen, onClose }: Props) {
             transition={{ duration: 0.25 }}
             className={`bubble ${m.role}`}
           >
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>{m.text}</p>
+            <div style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}
+              dangerouslySetInnerHTML={{
+                __html: m.text
+                  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                  .replace(/\n/g, '<br/>')
+              }}
+            />
 
             {/* Agent plan cards */}
             {m.data?._kind === 'agent_plan' && Array.isArray((m.data as any).plans) && (

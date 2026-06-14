@@ -1,8 +1,26 @@
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve .env path relative to this file (works regardless of working directory)
+_ENV_FILE = Path(__file__).parent.parent.parent / ".env"
+
+# Pre-populate os.environ from .env so pydantic-settings picks it up correctly
+if _ENV_FILE.exists():
+    for _line in _ENV_FILE.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if not _line or _line.startswith("#") or "=" not in _line:
+            continue
+        _k, _, _v = _line.partition("=")
+        _k = _k.strip()
+        _v = _v.strip().strip('"').strip("'")
+        # Override if not set or set to empty string
+        if _k and not os.environ.get(_k):
+            os.environ[_k] = _v
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), env_file_encoding="utf-8", extra="ignore")
 
     PROJECT_NAME: str = "Ticketly"
     API_V1_STR: str = "/api/v1"
@@ -23,13 +41,20 @@ class Settings(BaseSettings):
     OTP_SENDER_NAME: str = "Ticketly"
     OTP_TTL_SECONDS: int = 300
 
+    # LLM provider selection: "claude" | "gemini" | "openai"
+    LLM_PROVIDER: str = "claude"
+
+    # Anthropic / Claude
+    ANTHROPIC_API_KEY: str | None = None
+    ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
+
+    # Google Gemini
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # OpenAI
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
-
-    GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-1.5-flash"
-
-    LLM_PROVIDER: str = "gemini" # 'openai' or 'gemini'
 
     REDIS_URL: str = "redis://localhost:6379/0"
     SEAT_HOLD_TTL_SECONDS: int = 180
