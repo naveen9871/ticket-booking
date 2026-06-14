@@ -1,10 +1,13 @@
+import json
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.core.deps import get_current_user
 from app.db import get_session
-from app.models import Booking
+from app.models import Booking, Notification, SeatHold
 from app.services.checkout import persist_booking
 from app.services.tickets import build_ticket
 
@@ -47,3 +50,44 @@ def get_ticket(booking_id: int, session: Session = Depends(get_session), user=De
         raise HTTPException(status_code=404, detail="Booking not found")
     ticket = build_ticket(session, booking_id)
     return ticket
+
+
+@router.post("/{booking_id}/cancel")
+def cancel_booking(booking_id: int, session: Session = Depends(get_session), user=Depends(get_current_user)):
+    booking = session.exec(select(Booking).where(Booking.id == booking_id)).first()
+    if not booking or booking.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.status == "CANCELLED":
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    if booking.status != "CONFIRMED":
+        raise HTTPException(status_code=400, detail="Only confirmed bookings can be cancelled")
+
+    booking.status = "CANCELLED"
+    session.add(booking)
+
+    # Release any confirmed seat holds tied to this booking
+    holds = session.exec(
+        select(SeatHold).where(
+            SeatHold.showtime_id == booking.showtime_id,
+            SeatHold.user_id == user.id,
+            SeatHold.status == "CONFIRMED",
+        )
+    ).all()
+    for hold in holds:
+        hold.status = "RELEASED"
+        hold.updated_at = datetime.utcnow()
+        session.add(hold)
+
+    # Queue a cancellation notification
+    notification = Notification(
+        user_id=user.id,
+        channel="PUSH",
+        title="Booking cancelled",
+        message=f"Your booking #{booking_id} has been cancelled. Refund will be processed per policy.",
+        status="QUEUED",
+        metadata_json=json.dumps({"booking_id": booking_id}),
+    )
+    session.add(notification)
+    session.commit()
+
+    return {"booking_id": booking_id, "status": "CANCELLED", "message": "Booking cancelled successfully."}

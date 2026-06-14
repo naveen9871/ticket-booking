@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 const CITIES = ['Bengaluru', 'Hyderabad', 'Chennai', 'Mumbai', 'Delhi', 'Pune', 'Kolkata']
@@ -14,13 +14,28 @@ export function NavBar({ city, onCityChange }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
   const [cityOpen, setCityOpen] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   const links = [
     { to: '/', label: 'Discover' },
     { to: '/owner', label: 'For theatres', show: true },
     { to: '/admin', label: 'Admin', show: user?.is_admin },
   ]
+
+  const displayName = user?.full_name || user?.email || 'User'
+  const avatarLetter = displayName[0].toUpperCase()
 
   return (
     <nav
@@ -116,21 +131,94 @@ export function NavBar({ city, onCityChange }: Props) {
 
         {/* Auth */}
         {isLoggedIn ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #F5A623, #EF4444)',
-              display: 'grid', placeItems: 'center',
-              fontSize: 13, fontWeight: 700, color: '#fff',
-              cursor: 'pointer',
-            }}>
-              {(user?.full_name || user?.email || 'U')[0].toUpperCase()}
-            </div>
+          <div ref={profileRef} style={{ position: 'relative' }}>
             <button
-              onClick={() => { logout(); navigate('/login') }}
-              className="btn btn-ghost btn-sm"
-              style={{ fontSize: 13 }}
-            >Sign out</button>
+              onClick={() => setProfileOpen(p => !p)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 24,
+                padding: '4px 12px 4px 4px',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #F5A623, #EF4444)',
+                display: 'grid', placeItems: 'center',
+                fontSize: 13, fontWeight: 700, color: '#fff',
+                flexShrink: 0,
+              }}>
+                {avatarLetter}
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(237,244,242,0.85)', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.full_name || user?.email?.split('@')[0]}
+              </span>
+              <span style={{ opacity: 0.4, fontSize: 10 }}>▾</span>
+            </button>
+
+            {profileOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                background: '#141C28',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                padding: 8,
+                minWidth: 220,
+                zIndex: 200,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              }}>
+                {/* User info */}
+                <div style={{ padding: '10px 12px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#EDF4F2' }}>{user?.full_name || 'User'}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(237,244,242,0.45)', marginTop: 2 }}>{user?.email}</div>
+                  {user?.is_admin && (
+                    <span style={{ display: 'inline-block', marginTop: 6, fontSize: 10, padding: '2px 8px', borderRadius: 99, background: 'rgba(245,166,35,0.15)', color: '#F5A623', fontWeight: 600 }}>
+                      Admin
+                    </span>
+                  )}
+                </div>
+
+                {/* Menu items */}
+                {[
+                  { label: '🎟️ My Bookings', action: () => { navigate('/'); setProfileOpen(false) } },
+                  { label: '⚙️ Settings', action: () => setProfileOpen(false) },
+                ].map(item => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '9px 12px', borderRadius: 8,
+                      background: 'transparent',
+                      color: 'rgba(237,244,242,0.8)',
+                      fontSize: 13, border: 'none', cursor: 'pointer',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >{item.label}</button>
+                ))}
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: 6, paddingTop: 6 }}>
+                  <button
+                    onClick={() => { logout(); navigate('/login'); setProfileOpen(false) }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '9px 12px', borderRadius: 8,
+                      background: 'transparent',
+                      color: '#EF4444',
+                      fontSize: 13, border: 'none', cursor: 'pointer',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >🚪 Sign out</button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 8 }}>

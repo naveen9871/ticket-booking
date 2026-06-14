@@ -3,13 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db import init_db, get_session
-from app.routers import auth, movies, theatres, showtimes, search, recommendations, bookings, assistant, admin, content, autonomous
+from app.routers import auth, movies, theatres, showtimes, search, recommendations, bookings, assistant, admin, content, autonomous, transfers
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,3 +37,4 @@ app.include_router(assistant.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(content.router, prefix=settings.API_V1_STR)
 app.include_router(autonomous.router, prefix=settings.API_V1_STR)
+app.include_router(transfers.router, prefix=settings.API_V1_STR)

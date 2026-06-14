@@ -50,7 +50,7 @@ def rank_seat_blocks(
     for row_index, row in enumerate(seat_map):
         col_count = len(row)
         for block in _group_contiguous_blocks(row, party_size):
-            first_col = row.index(block[0])
+            first_col = next(i for i, s in enumerate(row) if s["id"] == block[0]["id"])
             prices = [float(seat.get("price") or preferences.get("base_price") or 250) for seat in block]
             avg_col = first_col + (len(block) - 1) / 2
             avg_price = sum(prices) / len(prices)

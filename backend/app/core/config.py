@@ -6,11 +6,15 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "Ticketly"
     API_V1_STR: str = "/api/v1"
+    DEBUG: bool = False
 
-    SECRET_KEY: str = "change-me"
+    SECRET_KEY: str = "change-me-in-production-with-a-long-random-string"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
     DATABASE_URL: str = "sqlite:///./ticketly.db"
+
+    # CORS — comma-separated list of allowed origins
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,https://arosai.in,https://www.arosai.in"
 
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None

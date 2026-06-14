@@ -205,6 +205,8 @@ class ReleaseSubscription(SQLModel, table=True):
     price_ceiling: float | None = None
     party_size: int = 2
     auto_reserve: bool = False
+    # FULLY_AUTONOMOUS | APPROVAL_REQUIRED | NOTIFY_ONLY
+    execution_mode: str = "NOTIFY_ONLY"
     status: str = "ACTIVE"
     last_checked_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -233,3 +235,60 @@ class AuditLog(SQLModel, table=True):
     resource_id: str | None = None
     metadata_json: str = "{}"
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Ticket Transfer & Waitlist (Section 6.7)
+# ---------------------------------------------------------------------------
+
+class TicketTransfer(SQLModel, table=True):
+    """Seller lists a booking for transfer at face value."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    booking_id: int = Field(index=True, unique=True)
+    seller_user_id: int = Field(index=True)
+    showtime_id: int = Field(index=True)
+    seats: str                          # JSON list of seat ids
+    face_value: float
+    # LISTED | MATCHED | COMPLETED | EXPIRED | CANCELLED
+    status: str = "LISTED"
+    expires_at: datetime = Field(index=True)
+    matched_buyer_id: int | None = Field(default=None, index=True)
+    acceptance_deadline: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Waitlist(SQLModel, table=True):
+    """FIFO queue of buyers waiting for a sold-out showtime."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    showtime_id: int = Field(index=True)
+    party_size: int = 2
+    price_ceiling: float | None = None
+    # WAITING | OFFERED | ACCEPTED | EXPIRED | CANCELLED
+    status: str = "WAITING"
+    queue_position: int = Field(index=True)
+    offer_expires_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Cancellation Sniping (Section 6.5)
+# ---------------------------------------------------------------------------
+
+class SoldOutWatch(SQLModel, table=True):
+    """User watches a sold-out showtime for released seats."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, index=True)
+    session_key: str = Field(index=True)
+    showtime_id: int = Field(index=True)
+    party_size: int = 2
+    price_ceiling: float | None = None
+    auto_snipe: bool = True             # attempt immediate reservation on release
+    # ACTIVE | TRIGGERED | COMPLETED | EXPIRED | CANCELLED
+    status: str = "ACTIVE"
+    last_checked_at: datetime | None = None
+    triggered_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

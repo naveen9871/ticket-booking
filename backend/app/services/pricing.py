@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlmodel import Session, select
 
-from app.models import Showtime, Booking
+from app.models import Booking, Screen, Showtime
 
 
 def compute_dynamic_price(session: Session, showtime_id: int, base_price: float) -> dict:
@@ -10,10 +10,11 @@ def compute_dynamic_price(session: Session, showtime_id: int, base_price: float)
     if not showtime:
         return {"price": base_price, "surge": 1.0, "reason": "unknown showtime"}
 
-    # Simulate occupancy if no actual bookings for demo
-    bookings = session.exec(select(Booking).where(Booking.showtime_id == showtime_id)).all()
+    bookings = session.exec(select(Booking).where(Booking.showtime_id == showtime_id, Booking.status == "CONFIRMED")).all()
     num_bookings = len(bookings)
-    occupancy = min(num_bookings / 50, 1.0) # Assume 50 capacity for demo surge logic
+    screen = session.exec(select(Screen).where(Screen.id == showtime.screen_id)).first()
+    capacity = screen.capacity if screen and screen.capacity else 100
+    occupancy = min(num_bookings / capacity, 1.0)
     
     now = datetime.utcnow()
     hours_to_show = max((showtime.start_time - now).total_seconds() / 3600, 0)

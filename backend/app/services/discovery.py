@@ -68,14 +68,28 @@ def discover_showtimes(session: Session, intent: dict[str, Any], limit: int = 24
                 continue
         if intent.get("language") and enriched["movie_language"] != intent["language"]:
             continue
-        if intent.get("budget_max") and enriched["base_price"] * intent.get("party_size", 1) > intent["budget_max"]:
-            continue
+        # Budget check: per-seat price vs budget (not total × party_size to avoid over-filtering)
+        if intent.get("budget_max"):
+            per_seat_budget = intent["budget_max"] / max(intent.get("party_size", 1), 1)
+            if enriched["base_price"] > per_seat_budget:
+                continue
         if not _matches_time_window(showtime.start_time, intent.get("time_window")):
             continue
+
+        # Format filter — only apply when explicitly requested
+        if intent.get("format"):
+            fmt_lower = intent["format"].lower().replace("_", " ")
+            showtime_fmt = (enriched["format"] or "").lower().replace("_", " ")
+            if fmt_lower not in showtime_fmt and showtime_fmt not in fmt_lower:
+                continue
 
         score = float(enriched["movie_rating"] or 0)
         if enriched["format"] == "IMAX":
             score += 0.35
+        elif "DOLBY" in (enriched["format"] or "").upper():
+            score += 0.25
+        elif "4DX" in (enriched["format"] or "").upper():
+            score += 0.2
         if intent.get("experience_mode") == "budget":
             score += max(0, 500 - enriched["base_price"]) / 500
         if intent.get("experience_mode") == "premium":

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session
 
@@ -29,12 +29,17 @@ def chat(payload: ChatRequest, session: Session = Depends(get_session), user=Dep
 
 @router.post("/confirm")
 def confirm(payload: ConfirmRequest, session: Session = Depends(get_session), user=Depends(get_current_user)):
-    booking = confirm_booking(
-        session,
-        user.id,
-        payload.showtime_id,
-        payload.seats,
-        hold_token=payload.hold_token,
-        session_key=payload.session_key,
-    )
+    try:
+        booking = confirm_booking(
+            session,
+            user.id,
+            payload.showtime_id,
+            payload.seats,
+            hold_token=payload.hold_token,
+            session_key=payload.session_key,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"booking": booking}

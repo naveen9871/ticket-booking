@@ -12,6 +12,9 @@ from app.services.intent import parse_intent
 from app.services.seat_recommendation import rank_seat_blocks
 
 
+EXECUTION_MODES = {"FULLY_AUTONOMOUS", "APPROVAL_REQUIRED", "NOTIFY_ONLY"}
+
+
 def create_release_subscription(
     session: Session,
     *,
@@ -24,7 +27,14 @@ def create_release_subscription(
     price_ceiling: float | None = None,
     party_size: int = 2,
     auto_reserve: bool = False,
+    execution_mode: str = "NOTIFY_ONLY",
 ) -> ReleaseSubscription:
+    if execution_mode not in EXECUTION_MODES:
+        execution_mode = "NOTIFY_ONLY"
+    # FULLY_AUTONOMOUS implies auto_reserve=True
+    if execution_mode == "FULLY_AUTONOMOUS":
+        auto_reserve = True
+
     subscription = ReleaseSubscription(
         user_id=user_id,
         session_key=session_key,
@@ -35,6 +45,7 @@ def create_release_subscription(
         price_ceiling=price_ceiling,
         party_size=party_size,
         auto_reserve=auto_reserve,
+        execution_mode=execution_mode,
     )
     session.add(subscription)
     session.commit()
@@ -72,14 +83,51 @@ def evaluate_subscription(session: Session, subscription: ReleaseSubscription) -
     subscription.updated_at = datetime.utcnow()
     session.add(subscription)
 
+    auto_reserved: dict | None = None
     if ranked_candidates:
+        mode = subscription.execution_mode
+        best = ranked_candidates[0]
+
+        if mode == "FULLY_AUTONOMOUS":
+            # Auto-hold seats without user approval
+            from app.services.retry_engine import retry_reservation
+            result = retry_reservation(
+                session,
+                showtime_id=best["id"],
+                user_id=subscription.user_id,
+                session_key=subscription.session_key,
+                party_size=subscription.party_size,
+            )
+            auto_reserved = result
+            notif_msg = (
+                f"Auto-booked {subscription.party_size} seat(s) for {subscription.movie_title} "
+                f"at {best['theatre_name']}. Hold token: {result.get('hold_token', 'N/A')}. "
+                "Complete payment to confirm."
+                if result.get("status") == "success"
+                else f"Auto-booking attempted but failed: {result.get('reason')}. Please book manually."
+            )
+        elif mode == "APPROVAL_REQUIRED":
+            notif_msg = (
+                f"Bookings are open for {subscription.movie_title} at {best['theatre_name']} "
+                f"in {subscription.city}. Tap to review and confirm your booking."
+            )
+        else:  # NOTIFY_ONLY
+            notif_msg = (
+                f"{best['theatre_name']} has seats available for {subscription.movie_title} in {subscription.city}."
+            )
+
         notification = Notification(
             user_id=subscription.user_id,
             title=f"Bookings open for {subscription.movie_title}",
-            message=f"{ranked_candidates[0]['theatre_name']} has seats in {subscription.city}.",
-            metadata_json=json.dumps({"subscription_id": subscription.id, "showtime_id": ranked_candidates[0]["id"]}),
+            message=notif_msg,
+            metadata_json=json.dumps({
+                "subscription_id": subscription.id,
+                "showtime_id": best["id"],
+                "execution_mode": mode,
+            }),
         )
         session.add(notification)
+
     session.commit()
 
     return {
@@ -87,7 +135,9 @@ def evaluate_subscription(session: Session, subscription: ReleaseSubscription) -
         "status": "MATCH_FOUND" if ranked_candidates else "WAITING",
         "matches": ranked_candidates[:5],
         "seat_recommendations": seat_recs,
+        "execution_mode": getattr(subscription, "execution_mode", "NOTIFY_ONLY"),
         "auto_reserve_enabled": subscription.auto_reserve,
+        "auto_reserved": auto_reserved,
     }
 
 

@@ -36,6 +36,7 @@ def persist_booking(
         hold.status = "CONFIRMED"
         session.add(hold)
         session.commit()
+        seats = json.loads(hold.seat_ids)
 
     pricing = compute_dynamic_price(session, showtime.id, showtime.base_price)
     total = pricing["price"] * len(seats)

@@ -8,7 +8,6 @@ import { ChatPanel } from '../components/ChatPanel'
 
 interface Props {
   city: string
-  token: string | null
 }
 
 const RELEASE_WATCH = [
@@ -48,7 +47,7 @@ const PUBLIC_STEPS = [
   'Hold seats and complete payment',
 ]
 
-export default function HomePage({ city, token }: Props) {
+export default function HomePage({ city }: Props) {
   const navigate = useNavigate()
   const [movies, setMovies] = useState<MovieCardData[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,7 +72,7 @@ export default function HomePage({ city, token }: Props) {
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       {/* Left chat panel — desktop only */}
       <aside className="left-chat">
-        <ChatPanel city={city} token={token} />
+        <ChatPanel city={city} />
       </aside>
 
       {/* Main content */}

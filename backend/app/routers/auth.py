@@ -3,8 +3,10 @@ import random
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlmodel import Session, select
 from authlib.integrations.starlette_client import OAuth
+import httpx
 
 from app.core.config import settings
 from app.core.deps import get_current_user
@@ -27,12 +29,23 @@ if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
 # OTP_STORE removed in favor of User model fields
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str | None = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 @router.post("/register")
-def register(email: str, password: str, full_name: str | None = None, session: Session = Depends(get_session)):
-    existing = session.exec(select(User).where(User.email == email)).first()
+def register(req: RegisterRequest, session: Session = Depends(get_session)):
+    existing = session.exec(select(User).where(User.email == req.email)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    user = User(email=email, full_name=full_name, hashed_password=get_password_hash(password))
+    user = User(email=req.email, full_name=req.full_name, hashed_password=get_password_hash(req.password))
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -41,9 +54,9 @@ def register(email: str, password: str, full_name: str | None = None, session: S
 
 
 @router.post("/login")
-def login(email: str, password: str, session: Session = Depends(get_session)):
-    user = session.exec(select(User).where(User.email == email)).first()
-    if not user or not user.hashed_password or not verify_password(password, user.hashed_password):
+def login(req: LoginRequest, session: Session = Depends(get_session)):
+    user = session.exec(select(User).where(User.email == req.email)).first()
+    if not user or not user.hashed_password or not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token(str(user.id))
     return {"access_token": token, "token_type": "bearer", "user": user}
@@ -62,7 +75,10 @@ def start_otp(phone: str, session: Session = Depends(get_session)):
     session.add(user)
     session.commit()
     # In a real app, send SMS here
-    return {"sent": True, "otp_debug": otp}
+    response: dict = {"sent": True}
+    if settings.DEBUG:
+        response["otp_debug"] = otp  # Only expose OTP in debug/dev mode
+    return response
 
 
 @router.post("/otp/verify")
@@ -84,28 +100,35 @@ def verify_otp(phone: str, otp: str, session: Session = Depends(get_session)):
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
-@router.get("/google/login")
-async def google_login(request: Request):
-    if "google" not in oauth:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
-    redirect_uri = settings.GOOGLE_REDIRECT_URI
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+class GoogleLoginRequest(BaseModel):
+    token: str
 
-
-@router.get("/google/callback")
-async def google_callback(request: Request, session: Session = Depends(get_session)):
-    if "google" not in oauth:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
-    token = await oauth.google.authorize_access_token(request)
-    user_info = token.get("userinfo")
-    if not user_info:
-        raise HTTPException(status_code=400, detail="Google userinfo missing")
-    user = session.exec(select(User).where(User.email == user_info["email"])).first()
+@router.post("/google")
+def google_login_spa(req: GoogleLoginRequest, session: Session = Depends(get_session)):
+    resp = httpx.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {req.token}"}
+    )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Invalid Google token")
+    user_info = resp.json()
+        
+    email = user_info.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email not provided by Google")
+        
+    user = session.exec(select(User).where(User.email == email)).first()
     if not user:
-        user = User(email=user_info["email"], full_name=user_info.get("name"), oauth_provider="google", oauth_subject=user_info.get("sub"))
+        user = User(
+            email=email,
+            full_name=user_info.get("name"),
+            oauth_provider="google",
+            oauth_subject=user_info.get("sub")
+        )
         session.add(user)
         session.commit()
         session.refresh(user)
+        
     access = create_access_token(str(user.id))
     return {"access_token": access, "token_type": "bearer", "user": user}
 

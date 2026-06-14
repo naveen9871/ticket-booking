@@ -39,7 +39,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { token } = useAuth()
   const [city, setCity] = useState('Bengaluru')
 
   return (
@@ -47,7 +46,7 @@ function AppRoutes() {
       <NavBar city={city} onCityChange={setCity} />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<HomePage city={city} token={token} />} />
+          <Route path="/" element={<HomePage city={city} />} />
           <Route path="/movie/:id" element={<MovieDetailPage />} />
           <Route path="/seats/:showtimeId" element={<SeatMapPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />

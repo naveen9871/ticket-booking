@@ -10,6 +10,17 @@ from app.models import Movie, Theatre
 
 GENRES = ["Action", "Drama", "Comedy", "Thriller", "Sci-Fi", "Romance", "Horror", "Family"]
 LANGUAGES = ["Telugu", "Tamil", "Hindi", "English", "Kannada", "Malayalam"]
+FORMATS = {
+    "imax": "IMAX",
+    "dolby atmos": "DOLBY_ATMOS",
+    "dolby": "DOLBY_ATMOS",
+    "4dx": "4DX",
+    "4d": "4DX",
+    "recliner": "RECLINER",
+    "premium": "PREMIUM",
+}
+# Prepositions / stop-words that end a movie title in natural language
+_TITLE_STOP_WORDS = r"\b(?:at|in|near|on|tonight|today|tomorrow|for|under|below|with|by|from|of|this|next|morning|afternoon|evening|weekend|and|or|the)\b"
 
 
 def _extract_budget(message: str) -> int | None:
@@ -27,15 +38,16 @@ def _extract_budget(message: str) -> int | None:
     return None
 
 
-def _extract_party_size(message: str) -> int:
-    match = re.search(r"(\d+)\s*(tickets?|people|seats?)", message.lower())
+def _extract_party_size(message: str) -> int | None:
+    # Matches: "4 seats", "2 tickets", "3 people", "2 recliner tickets", "4 IMAX seats"
+    match = re.search(r"(\d+)\s*(?:\w+\s+)?(?:tickets?|people|seats?)", message.lower())
     if match:
         return max(int(match.group(1)), 1)
     if "date night" in message.lower():
         return 2
     if "family" in message.lower():
         return 4
-    return 2
+    return None
 
 
 def _extract_time_hint(message: str) -> dict[str, str | None]:
@@ -81,22 +93,38 @@ def _extract_genre(message: str) -> str | None:
 
 
 def _extract_movie_title(session: Session, message: str) -> str | None:
-    # Try common movie patterns (case insensitive)
+    # First: exact match against known movies in the DB (most reliable)
+    movies = session.exec(select(Movie)).all()
+    movies_sorted = sorted(movies, key=lambda m: len(m.title), reverse=True)
+    for movie in movies_sorted:
+        if movie.title.lower() in message.lower():
+            return movie.title
+
+    # Fallback: heuristic patterns — capture words until a stop-word or number boundary
+    # "4 seats for Coolie at PVR" → captures "Coolie" (stops at "at")
     patterns = [
-        r"(?:for|watch|about|book)\s+([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*)",
-        r"(?:when)\s+([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*)\s+(?:open|booking)",
+        rf"(?:for|watch|about|book)\s+((?:[a-zA-Z0-9]+\s*){{1,4}})(?:{_TITLE_STOP_WORDS}|$|\d)",
+        rf"(?:when)\s+((?:[a-zA-Z0-9]+\s*){{1,4}})(?:open|booking|tickets?|shows?)",
+        rf"(?:tickets?\s+for|see)\s+((?:[a-zA-Z0-9]+\s*){{1,4}})(?:{_TITLE_STOP_WORDS}|$)",
     ]
     for p in patterns:
         match = re.search(p, message, re.IGNORECASE)
         if match:
-            return match.group(1).strip().title()
-    
-    # Check against database titles (sort by length descending to match longest title first)
-    movies = session.exec(select(Movie)).all()
-    movies.sort(key=lambda m: len(m.title), reverse=True)
-    for movie in movies:
-        if movie.title.lower() in message.lower():
-            return movie.title
+            candidate = match.group(1).strip()
+            # Reject if it looks like a number/seat-count phrase
+            if re.fullmatch(r"\d+", candidate):
+                continue
+            return candidate.title()
+
+    return None
+
+
+def _extract_format(message: str) -> str | None:
+    lowered = message.lower()
+    # longest key first so "dolby atmos" matches before "dolby"
+    for key in sorted(FORMATS, key=len, reverse=True):
+        if key in lowered:
+            return FORMATS[key]
     return None
 
 
@@ -161,8 +189,10 @@ def parse_intent(
     genre = _extract_genre(message) or (profile.get("favorite_genres") or [None])[0]
     language = _extract_language(message) or (profile.get("favorite_languages") or [None])[0]
     budget_max = _extract_budget(message)
-    party_size = context.get("seat_count") or _extract_party_size(message)
+    # Explicit message number wins; fall back to context; finally default to 2
+    party_size = _extract_party_size(message) or context.get("seat_count") or 2
     experience_mode = _extract_experience_mode(message)
+    fmt = _extract_format(message)
     movie = _extract_movie_title(session, message)
 
     if budget_max is None and experience_mode == "budget":
@@ -198,6 +228,7 @@ def parse_intent(
         "language": language,
         "budget_max": budget_max,
         "party_size": party_size,
+        "format": fmt,
         "experience_mode": experience_mode,
         "time_label": time_hint["time_label"],
         "time_window": time_hint["window"],

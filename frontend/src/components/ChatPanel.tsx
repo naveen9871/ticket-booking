@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import api from '../api'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
 const STARTERS = [
   'Find 4 seats for Coolie near Whitefield',
@@ -25,13 +26,13 @@ interface Message {
 
 interface Props {
   city: string
-  token: string | null
   mobileOpen?: boolean
   onClose?: () => void
 }
 
-export function ChatPanel({ city, token, mobileOpen, onClose }: Props) {
+export function ChatPanel({ city, mobileOpen, onClose }: Props) {
   const navigate = useNavigate()
+  const { token } = useAuth()
   const [messages, setMessages] = useState<Message[]>([{
     id: '0',
     role: 'assistant',
@@ -40,7 +41,7 @@ export function ChatPanel({ city, token, mobileOpen, onClose }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionKey] = useState(createSessionKey)
-  const [context, setContext] = useState<Record<string, unknown>>({ seat_count: 2, city, session_key: sessionKey })
+  const [context, setContext] = useState<Record<string, unknown>>({ city, session_key: sessionKey })
   const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -102,7 +103,7 @@ export function ChatPanel({ city, token, mobileOpen, onClose }: Props) {
         {STARTERS.map(s => (
           <button
             key={s}
-            onClick={() => send(s.replace(/^[^\s]+ /, ''))}
+            onClick={() => send(s)}
             style={{
               background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.1)',

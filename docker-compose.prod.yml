@@ -26,6 +26,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         - VITE_API_URL=https://arosai.in/api/v1
+        - VITE_GOOGLE_CLIENT_ID=1027446455771-nqgr3r44795s0g2rin4c69ilqul0otjd.apps.googleusercontent.com
     ports:
       - "3000:80"
     restart: unless-stopped

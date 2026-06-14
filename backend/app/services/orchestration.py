@@ -11,6 +11,7 @@ from app.services.planning import generate_plans
 from app.services.preferences import get_or_create_memory, load_profile, update_memory_from_intent
 from app.services.recovery import build_recovery_message, normalize_failure
 from app.services.release_monitoring import create_release_subscription
+from app.services.retry_engine import dynamic_replan, suggest_alternatives
 from app.services.workflow import (
     create_agent_session,
     log_workflow_event,
@@ -57,7 +58,15 @@ def run_agentic_planning(
 
         if intent.get("kind") == "watch":
             log_workflow_event(session, agent_session.id, "watch-agent", "SUBSCRIPTION_STARTED", "RUNNING")
-            movie_title = intent.get("movie") or message # fallback to raw message for title if not parsed
+            movie_title = intent.get("movie")
+            if not movie_title:
+                update_agent_session(session, agent_session, status="FAILED", last_error="Movie title not identified")
+                return {
+                    "type": "message",
+                    "message": "I couldn't identify the movie title. Please mention the movie name clearly — e.g. 'Alert me when Pushpa 3 bookings open'.",
+                    "context": {"session_key": session_key},
+                    "trace": trace,
+                }
             subscription = create_release_subscription(
                 session,
                 session_key=session_key,
@@ -85,9 +94,43 @@ def run_agentic_planning(
 
         if not candidates:
             update_agent_session(session, agent_session, status="FAILED", last_error="No matching inventory")
-            trace.append({"agent": "Recovery Agent", "status": "done", "detail": "Prepared a fallback prompt for broader search."})
+            trace.append({"agent": "Recovery Agent", "status": "done", "detail": "No exact matches — trying relaxed constraints."})
+
+            # Try alternatives with relaxed budget / format / time
+            alt = suggest_alternatives(session, intent)
+            if alt["status"] == "alternatives_found":
+                alt_candidates = alt["suggestions"]
+                alt_plans = generate_plans(session, intent, alt_candidates)
+                saved_alt = replace_plans(session, agent_session.id, alt_plans)
+                trace.append({"agent": "Recovery Agent", "status": "done", "detail": f"Found {len(alt_candidates)} relaxed alternative(s)."})
+                budget_note = f"under ₹{intent['budget_max']}" if intent.get("budget_max") else ""
+                relaxed = alt.get("relaxed_constraints", {})
+                relaxed_parts = []
+                if relaxed.get("budget"):
+                    relaxed_parts.append("budget")
+                if relaxed.get("format"):
+                    relaxed_parts.append("format")
+                if relaxed.get("time"):
+                    relaxed_parts.append("timing")
+                relaxed_str = f" (relaxed {', '.join(relaxed_parts)})" if relaxed_parts else ""
+                return {
+                    "type": "agent_plan",
+                    "message": (
+                        f"I couldn't find exact matches{f' {budget_note}' if budget_note else ''}, "
+                        f"but here are the closest alternatives{relaxed_str}:"
+                    ),
+                    "data": {
+                        "intent": intent,
+                        "plans": alt_plans,
+                        "top_candidates": alt_candidates[:6],
+                        "fallback": True,
+                    },
+                    "context": {"session_key": session_key, "city": intent.get("city"), "seat_count": intent.get("party_size", 2)},
+                    "trace": trace,
+                }
+
             return {
-                **build_recovery_message(intent, "no matching shows were available"),
+                **build_recovery_message(intent, "no matching shows were available even after broadening the search"),
                 "context": {"session_key": session_key, "city": intent.get("city"), "seat_count": intent.get("party_size", 2)},
                 "trace": trace,
             }
