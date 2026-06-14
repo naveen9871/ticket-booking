@@ -90,7 +90,8 @@ export default function SeatMapPage() {
   useEffect(() => {
     if (!holdInfo?.expires_at) return
     const tick = setInterval(() => {
-      const secs = Math.max(0, Math.round((new Date(holdInfo.expires_at).getTime() - Date.now()) / 1000))
+      const expiresAtStr = holdInfo.expires_at.endsWith('Z') ? holdInfo.expires_at : holdInfo.expires_at + 'Z'
+      const secs = Math.max(0, Math.round((new Date(expiresAtStr).getTime() - Date.now()) / 1000))
       setSecondsLeft(secs)
       if (secs === 0) clearInterval(tick)
     }, 1000)
@@ -117,7 +118,7 @@ export default function SeatMapPage() {
         state: {
           showtimeId, seats: selectedSeats,
           holdToken: holdRes.data.hold_token,
-          expiresAt: holdRes.data.expires_at,
+          expiresAt: holdRes.data.expires_at.endsWith('Z') ? holdRes.data.expires_at : holdRes.data.expires_at + 'Z',
           total: pRes.data.total,
           showtime,
           sessionKey: SESSION_KEY,
