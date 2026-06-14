@@ -389,7 +389,7 @@ def _openai_agent_loop(
         try:
             with httpx.Client(timeout=30) as client:
                 resp = client.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    f"{settings.OPENAI_BASE_URL}/chat/completions",
                     headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}", "Content-Type": "application/json"},
                     json={"model": settings.OPENAI_MODEL, "messages": messages, "tools": openai_tools, "temperature": 0.3},
                 )

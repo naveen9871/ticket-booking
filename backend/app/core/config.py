@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
 
     REDIS_URL: str = "redis://localhost:6379/0"
     SEAT_HOLD_TTL_SECONDS: int = 180
