@@ -183,7 +183,7 @@ export function NavBar({ city, onCityChange }: Props) {
 
                 {/* Menu items */}
                 {[
-                  { label: '🎟️ My Bookings', action: () => { navigate('/'); setProfileOpen(false) } },
+                  { label: '🎟️ My Bookings', action: () => { navigate('/my-bookings'); setProfileOpen(false) } },
                   { label: '⚙️ Settings', action: () => setProfileOpen(false) },
                 ].map(item => (
                   <button

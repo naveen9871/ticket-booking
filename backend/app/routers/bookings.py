@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from app.core.deps import get_current_user
 from app.db import get_session
-from app.models import Booking, Notification, SeatHold
+from app.models import Booking, Movie, Notification, Screen, SeatHold, Showtime, Theatre
 from app.services.checkout import persist_booking
 from app.services.tickets import build_ticket
 
@@ -23,7 +23,29 @@ class BookingCreateRequest(BaseModel):
 
 @router.get("")
 def list_bookings(session: Session = Depends(get_session), user=Depends(get_current_user)):
-    return session.exec(select(Booking).where(Booking.user_id == user.id)).all()
+    bookings = session.exec(select(Booking).where(Booking.user_id == user.id).order_by(Booking.created_at.desc())).all()
+    result = []
+    for b in bookings:
+        showtime = session.exec(select(Showtime).where(Showtime.id == b.showtime_id)).first()
+        movie = session.exec(select(Movie).where(Movie.id == showtime.movie_id)).first() if showtime else None
+        screen = session.exec(select(Screen).where(Screen.id == showtime.screen_id)).first() if showtime else None
+        theatre = session.exec(select(Theatre).where(Theatre.id == screen.theatre_id)).first() if screen else None
+        result.append({
+            "id": b.id,
+            "showtime_id": b.showtime_id,
+            "seats": json.loads(b.seats) if isinstance(b.seats, str) else b.seats,
+            "total_price": b.total_price,
+            "status": b.status,
+            "created_at": b.created_at.isoformat(),
+            "movie_title": movie.title if movie else None,
+            "movie_poster": movie.poster_url if movie else None,
+            "theatre_name": theatre.name if theatre else None,
+            "theatre_city": theatre.city if theatre else None,
+            "screen_name": screen.name if screen else None,
+            "showtime_format": showtime.format if showtime else None,
+            "start_time": showtime.start_time.isoformat() if showtime else None,
+        })
+    return result
 
 
 @router.post("")

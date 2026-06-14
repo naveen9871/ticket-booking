@@ -112,12 +112,15 @@ export default function TicketPage() {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/')}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" style={{ flex: 1, minWidth: 120 }} onClick={() => navigate('/')}>
               🏠 Home
             </button>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => window.print()}>
-              📥 Download
+            <button className="btn btn-secondary" style={{ flex: 1, minWidth: 120 }} onClick={() => navigate('/my-bookings')}>
+              🎟️ My Bookings
+            </button>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => window.print()}>
+              📥 Download Ticket
             </button>
           </div>
         </motion.div>

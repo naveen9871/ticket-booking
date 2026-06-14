@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import api from '../api'
 import { SeatMap, type SeatData } from '../components/SeatMap'
+
+const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8001'
 
 const SESSION_KEY = typeof window !== 'undefined' && window.crypto?.randomUUID
   ? window.crypto.randomUUID()
@@ -34,6 +36,8 @@ export default function SeatMapPage() {
   const [loadingHold, setLoadingHold] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [liveUpdate, setLiveUpdate] = useState<string | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
     api.get(`/showtimes/${showtimeId}/seats`, {
@@ -58,6 +62,28 @@ export default function SeatMapPage() {
     }).finally(() => setLoading(false))
 
     api.get(`/showtimes/${showtimeId}`).then(r => setShowtime(r.data)).catch(() => {})
+  }, [showtimeId])
+
+  // WebSocket for real-time seat updates
+  useEffect(() => {
+    if (!showtimeId) return
+    const ws = new WebSocket(`${WS_BASE}/ws/seats/${showtimeId}`)
+    wsRef.current = ws
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data)
+        if (msg.type === 'seats_booked' && Array.isArray(msg.seats)) {
+          setSeats(prev => prev.map(s =>
+            msg.seats.includes(s.id) ? { ...s, status: 'booked' as const } : s
+          ))
+          setSelectedSeats(prev => prev.filter(id => !msg.seats.includes(id)))
+          setLiveUpdate(`${msg.seats.length} seat(s) just booked by another user`)
+          setTimeout(() => setLiveUpdate(null), 4000)
+        }
+      } catch {}
+    }
+    const ping = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping') }, 25000)
+    return () => { clearInterval(ping); ws.close() }
   }, [showtimeId])
 
   // Countdown timer for hold
@@ -139,6 +165,29 @@ export default function SeatMapPage() {
             </div>
           </div>
         </div>
+
+        {/* Live seat update notification */}
+        {liveUpdate && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            style={{
+              background: 'rgba(239,68,68,0.1)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: 10,
+              padding: '10px 14px',
+              marginBottom: 12,
+              fontSize: 13,
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            🔴 <strong>Live update:</strong> {liveUpdate}
+          </motion.div>
+        )}
 
         {/* AI recommendation strip */}
         <div className="notif-bar" style={{ marginBottom: 20 }}>

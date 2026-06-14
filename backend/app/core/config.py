@@ -35,5 +35,21 @@ class Settings(BaseSettings):
     SEAT_HOLD_TTL_SECONDS: int = 180
     DEMO_SEED_ON_STARTUP: bool = False
 
+    # Razorpay
+    RAZORPAY_KEY_ID: str = "rzp_test_T1S4DLu3XvrFRf"
+    RAZORPAY_KEY_SECRET: str = "cLkCtFhWIz0u4AYOmMOQUrhO"
+
+    # Email (SendGrid)
+    SENDGRID_API_KEY: str | None = None
+    EMAIL_FROM: str = "noreply@ticketly.in"
+    EMAIL_FROM_NAME: str = "Ticketly"
+
+    # Rate limiting
+    RATE_LIMIT_SEAT_HOLD: str = "10/minute"
+    RATE_LIMIT_BOOKING: str = "20/minute"
+
+    # Showtime cache TTL in seconds
+    SHOWTIME_CACHE_TTL: int = 60
+
 
 settings = Settings()

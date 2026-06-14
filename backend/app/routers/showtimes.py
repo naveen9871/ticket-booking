@@ -1,14 +1,18 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.db import get_session
 from app.models import Movie, Screen, Theatre, Showtime
 from app.services.pricing import compute_dynamic_price
-from app.services.seats import create_seat_hold, get_hold, get_seat_map, auto_select_seats
+from app.services.seats import auto_select_seats, create_seat_hold, get_hold, get_seat_map
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/showtimes", tags=["showtimes"])
 
 
@@ -20,6 +24,17 @@ class HoldRequest(BaseModel):
 
 @router.get("")
 def list_showtimes(movie_id: int | None = None, city: str | None = None, session: Session = Depends(get_session)):
+    import json as _json
+    import redis as _redis
+    cache_key = f"showtimes:{movie_id}:{city}"
+    try:
+        r = _redis.from_url(settings.REDIS_URL, decode_responses=True)
+        cached = r.get(cache_key)
+        if cached:
+            return _json.loads(cached)
+    except Exception:
+        r = None
+
     query = select(Showtime)
     if movie_id:
         query = query.where(Showtime.movie_id == movie_id)
@@ -45,12 +60,19 @@ def list_showtimes(movie_id: int | None = None, city: str | None = None, session
                 "theatre_id": theatre.id if theatre else None,
                 "theatre_name": theatre.name if theatre else None,
                 "city": theatre.city if theatre else None,
-                "start_time": show.start_time,
+                "start_time": show.start_time.isoformat() if show.start_time else None,
                 "base_price": show.base_price,
                 "format": show.format,
                 "status": show.status,
             }
         )
+
+    try:
+        if r:
+            r.setex(cache_key, settings.SHOWTIME_CACHE_TTL, _json.dumps(enriched))
+    except Exception:
+        pass
+
     return enriched
 
 
@@ -68,7 +90,8 @@ def showtime_seats(
 
 
 @router.post("/{showtime_id}/holds")
-def create_hold(showtime_id: int, payload: HoldRequest, session: Session = Depends(get_session)):
+@limiter.limit(settings.RATE_LIMIT_SEAT_HOLD)
+def create_hold(request: Request, showtime_id: int, payload: HoldRequest, session: Session = Depends(get_session)):
     hold = create_seat_hold(
         session,
         showtime_id,

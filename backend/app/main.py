@@ -1,11 +1,33 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.core.config import settings
-from app.db import init_db, get_session
-from app.routers import auth, movies, theatres, showtimes, search, recommendations, bookings, assistant, admin, content, autonomous, transfers
+from app.db import get_session, init_db
+from app.routers import (
+    admin,
+    assistant,
+    auth,
+    autonomous,
+    bookings,
+    content,
+    movies,
+    recommendations,
+    search,
+    showtimes,
+    theatres,
+    transfers,
+)
+from app.routers import payments, ws as ws_router
+
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title=settings.PROJECT_NAME)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,3 +60,5 @@ app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(content.router, prefix=settings.API_V1_STR)
 app.include_router(autonomous.router, prefix=settings.API_V1_STR)
 app.include_router(transfers.router, prefix=settings.API_V1_STR)
+app.include_router(payments.router, prefix=settings.API_V1_STR)
+app.include_router(ws_router.router)

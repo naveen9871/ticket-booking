@@ -13,6 +13,7 @@ import TicketPage from './pages/TicketPage'
 import LoginPage from './pages/LoginPage'
 import AdminDashboard from './pages/AdminDashboard'
 import TheatreOwnerDashboard from './pages/TheatreOwnerDashboard'
+import MyBookingsPage from './pages/MyBookingsPage'
 
 function PageLoader() {
   return (
@@ -52,6 +53,7 @@ function AppRoutes() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/ticket/:bookingId" element={<TicketPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/my-bookings" element={<RequireAuth><MyBookingsPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
           <Route path="/owner" element={<RequireAuth><TheatreOwnerDashboard /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
