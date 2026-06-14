@@ -61,6 +61,11 @@ def discover_showtimes(session: Session, intent: dict[str, Any], limit: int = 24
             if not city_match:
                 continue
 
+        if intent.get("movie"):
+            target_movie = intent["movie"].lower()
+            if enriched["movie_title"] and target_movie not in enriched["movie_title"].lower():
+                continue
+
         # Allow partial genre matches (e.g. "Action" matches "Action, Thriller")
         if intent.get("genre"):
             target_genre = intent["genre"].lower()
