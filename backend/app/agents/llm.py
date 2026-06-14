@@ -376,7 +376,9 @@ def _openai_agent_loop(
         role = turn.get("role")
         parts = turn.get("parts", [])
         content = parts[0] if isinstance(parts, list) and parts and isinstance(parts[0], str) else str(parts)
-        if role in ("user", "assistant") and content:
+        if role in ("user", "assistant", "model") and content:
+            if role == "model":
+                role = "assistant"
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": message})
 
